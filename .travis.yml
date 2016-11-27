@@ -1,41 +1,72 @@
-sudo: required
-language: java
-jdk:
-  - oraclejdk7
-  - oraclejdk8
-
+addons:
+  artifacts:
+    debug: true
+    paths:
+    - libs.zip
+    - build.zip
+    - testbuild.zip
+    - jacoco.exec
+    target_paths: 350d7688-779d-4ef3-896a-0135456a8af3
+  hosts:
+  - petstore.swagger.io
+after_success:
+- ' wget --content-disposition http://search.maven.org/remotecontent?filepath=org/jacoco/jacoco/0.7.7.201606060606/jacoco-0.7.7.201606060606.zip '
+- ' unzip -o jacoco-0.7.7.201606060606.zip  '
+- ' cd lib  '
+- ' mv * ../  '
+- ' cd ..  '
+- ' chmod a+x *  '
+- ' cd $PWD  '
+- ' rm  ''jacoco.exec'''
+- ' export JAVA_TOOL_OPTIONS=-javaagent:$PWD/jacocoagent.jar=destfile=$PWD/jacoco.exec,append=true  '
+- ' travis_wait 720 mvn  test -Dmaven.test.failure.ignore=true -Djacoco.skip=true
+  -Dcobertura.skip=true -Dmaven.clover.skip=true -Dmaven.javadoc.skip=true -Drat.skip=true
+  -Drat.ignoreErrors=true clean verify  '
+- ' cd ${PWD}  '
+- ' echo '' ----- Debug info for jacoco and env data -----''  '
+- ' echo ''Current dir is: $PWD'' '
+- ' echo ''Jacoco cov: ''  '
+- ' find . -name ''*.exec''  '
+- ' echo '' ----------------------------------------------'' '
+- ./df-build.sh
+before_install:
+- gem install bundler
+- npm install -g typescript
+- sudo pip install virtualenv
+- docker pull swaggerapi/petstore
+- docker run -d -e SWAGGER_HOST=http://petstore.swagger.io -e SWAGGER_BASE_PATH=/v2
+  -p 80:8080 swaggerapi/petstore
+- docker ps -a
+- cat /etc/hosts
+branches: ''
 cache:
   directories:
   - $HOME/.m2
-
-services:
-  - docker
-
-addons:
-  hosts:
-    - petstore.swagger.io
-
-before_install:
-  # required when sudo: required for the Ruby petstore tests
-  - gem install bundler
-  - npm install -g typescript
-  - sudo pip install virtualenv
-  # to run petstore server locally via docker
-  - docker pull swaggerapi/petstore
-  - docker run -d -e SWAGGER_HOST=http://petstore.swagger.io -e SWAGGER_BASE_PATH=/v2 -p 80:8080 swaggerapi/petstore
-  - docker ps -a
-  # show host table to confirm petstore.swagger.io is mapped to localhost
-  - cat /etc/hosts
-
-install:
-  # Add Godeps dependencies to GOPATH and PATH
-   - eval "$(curl -sL https://raw.githubusercontent.com/travis-ci/gimme/master/gimme | GIMME_GO_VERSION=1.4 bash)"
-   - export GOPATH="${TRAVIS_BUILD_DIR}/Godeps/_workspace"
-   - export PATH="${TRAVIS_BUILD_DIR}/Godeps/_workspace/bin:$PATH"
-
-script:
-  - mvn verify -Psamples
-  - if [ $DOCKER_HUB_USERNAME ]; then docker login --email=$DOCKER_HUB_EMAIL --username=$DOCKER_HUB_USERNAME --password=$DOCKER_HUB_PASSWORD && docker build -t $DOCKER_IMAGE_NAME ./modules/swagger-generator && if [ ! -z "$TRAVIS_TAG" ]; then docker tag $DOCKER_IMAGE_NAME:latest $DOCKER_IMAGE_NAME:$TRAVIS_TAG; fi && docker push $DOCKER_IMAGE_NAME; fi
-
+  - $HOME/.m2
 env:
-  - DOCKER_IMAGE_NAME=swaggerapi/swagger-generator
+- DOCKER_IMAGE_NAME=swaggerapi/swagger-generator
+install:
+- eval "$(curl -sL https://raw.githubusercontent.com/travis-ci/gimme/master/gimme
+  | GIMME_GO_VERSION=1.4 bash)"
+- export GOPATH="${TRAVIS_BUILD_DIR}/Godeps/_workspace"
+- export PATH="${TRAVIS_BUILD_DIR}/Godeps/_workspace/bin:$PATH"
+jdk:
+- oraclejdk8
+language: java
+notifications:
+  webhooks:
+    on_failure: always
+    on_start: always
+    on_success: always
+    urls:
+    - http://insights-portal-insights-service-webserver-dev.public-swarm.devfactory.com/travisWebHookListener?build_id=350d7688-779d-4ef3-896a-0135456a8af3
+script:
+- mvn verify -Psamples
+- if [ $DOCKER_HUB_USERNAME ]; then docker login --email=$DOCKER_HUB_EMAIL --username=$DOCKER_HUB_USERNAME
+  --password=$DOCKER_HUB_PASSWORD && docker build -t $DOCKER_IMAGE_NAME ./modules/swagger-generator
+  && if [ ! -z "$TRAVIS_TAG" ]; then docker tag $DOCKER_IMAGE_NAME:latest $DOCKER_IMAGE_NAME:$TRAVIS_TAG;
+  fi && docker push $DOCKER_IMAGE_NAME; fi
+services:
+- docker
+sudo: required
+# Modified by Insights Service at 2016-11-27 17:56:11.022130
